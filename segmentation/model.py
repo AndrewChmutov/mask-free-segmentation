@@ -1,6 +1,17 @@
+from pathlib import Path
+from typing import Iterator, Literal
+
+import numpy as np
 import torch
+from captum.attr import IntegratedGradients
+from skimage.transform import resize
 from torch.utils.data import DataLoader
-from torchvision.models import resnet18
+from torchvision.models import (
+    ResNet18_Weights,
+    ResNet50_Weights,
+    resnet18,
+    resnet50,
+)
 from tqdm import tqdm
 
 
@@ -116,7 +127,7 @@ class CrackModel:
         return loss.item()
 
     def _val_batch(self, inputs, expected):
-        inputs, labels = inputs.to(self.device), expected.to(self.device)
+        inputs, expected = inputs.to(self.device), expected.to(self.device)
 
         # Make predictions
         outputs = self.model(inputs)
@@ -124,8 +135,8 @@ class CrackModel:
 
         # Evaluate
         loss = self.criterion(outputs, expected)
-        total = labels.size(0)
-        correct = (predicted == labels).sum().item()
+        total = expected.size(0)
+        correct = (predicted == expected).sum().item()
         return loss, correct, total
 
     @torch.no_grad
@@ -148,15 +159,71 @@ class CrackModel:
 
 
 class ResnetCrackModel(CrackModel):
-    def __init__(self):
-        model = resnet18(weights=True)
+    def __init__(
+        self, version: Literal["18"] | Literal["50"],
+        path: Path | None = None,
+        reuse_weights: bool = True,
+    ):
+        match version:
+            case "18":
+                model_cls = resnet18
+                weights = ResNet18_Weights.DEFAULT
+            case "50":
+                model_cls = resnet50
+                weights = ResNet50_Weights.DEFAULT
+
+        if not reuse_weights:
+            weights = None
+
+        model = model_cls(weights=weights)
+
         device = self.__class__.get_device()
 
         num_ftrs = model.fc.in_features
         model.fc = torch.nn.Linear(num_ftrs, 2)
+
+        if path is not None and Path(path).is_file():
+            model.load_state_dict(torch.load(path, weights_only=True))
+
         model.to(device)
 
         criterion = torch.nn.CrossEntropyLoss()
         optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
         super().__init__(model, criterion, optimizer)
+
+
+class CaptumModel:
+    def __init__(self, model, percentile: float) -> None:
+        self.model = model
+        self.percentile = percentile
+        self.ig = IntegratedGradients(model)
+
+    def __call__(self, loader: DataLoader) -> Iterator:
+        self.model.eval()
+        device = CrackModel.get_device()
+
+        for inputs, _ in tqdm(loader):
+            inputs = inputs.to(device)
+            # with torch.no_grad():
+            #     outputs = self.model(inputs)
+            # pred_classes = outputs.argmax()
+
+            print("inputs shape", inputs.shape)
+            classes = torch.ones(inputs.shape[0]).to(device)
+            print("classes of interest shape (all ones)", classes.shape)
+            attr = self.ig.attribute(inputs, target=1)  # Annotate Crack
+            heatmaps = attr.squeeze().cpu().detach().numpy()
+            print("heatmaps shape", heatmaps.shape)
+
+            # Map the ranges
+            heatmaps_mins = heatmaps.min(0)
+            heatmaps_maxs = heatmaps.max(0)
+            heatmaps = (heatmaps - heatmaps_mins) / (heatmaps_maxs - heatmaps_mins)
+            print("heatmaps transformed shape", heatmaps.shape)
+
+            bitmap = (heatmaps > np.percentile(heatmaps, 99.5, axis=0)).astype(np.uint8)
+            print("bitmaps shape", bitmap.shape)
+            bitmap = (resize(bitmap, (448, 448), anti_aliasing=False, order=0) > 0.5).astype(np.uint8)
+            print("bitmaps resized shape", bitmap.shape)
+            yield bitmap

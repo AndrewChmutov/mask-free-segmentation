@@ -10,24 +10,25 @@ from torch.utils.data import DataLoader, Dataset, Subset
 
 
 class CrackDataset(ABC, Dataset):
-    def __init__(self, root_dir: str, **kwargs):
+    def __init__(self, root_dir: str | Path, **kwargs):
         self.root_dir = root_dir
-        self.image_paths = []
         self.image_paths = list((Path(root_dir) / "images").iterdir())
 
     def __len__(self):
         return len(self.image_paths)
 
-    def _get_x(self, path: Path) -> Any:
+    def _transform(self, path: Path):
         return Image.open(path).convert("RGB")
 
+    def _get_x(self, i: int) -> Any:
+        return self._transform(self.image_paths[i])
+
     @abstractmethod
-    def _get_y(self, path: Path) -> Any:
+    def _get_y(self, i: int) -> Any:
         ...
 
     def __getitem__(self, idx):
-        path = self.image_paths[idx]
-        return self._get_x(path), self._get_y(path)
+        return self._get_x(idx), self._get_y(idx)
 
 
 class WithTransform(CrackDataset):
@@ -37,8 +38,8 @@ class WithTransform(CrackDataset):
         self.transform = kwargs["transform"]
 
     @override
-    def _get_x(self, path: Path):
-        image = super()._get_x(path)
+    def _transform(self, path):
+        image = super()._transform(path)
         if self.transform:
             image = self.transform(image)
         return image
@@ -47,23 +48,29 @@ class WithTransform(CrackDataset):
 class CrackDataset3(WithTransform):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.labels = list(map(self._get_y, self.image_paths))
+        self.pictures = list(map(super()._get_x, range(len(self.image_paths))))
+        self.labels = list(map(self._get_y, range(len(self.image_paths))))
+
+    def _get_x(self, i: int):
+        return self.pictures[i]
 
     @override
-    def _get_y(self, path: Path):
-        return 0 if path.name.startswith("noncrack") else 1
+    def _get_y(self, i: int):
+        return 0 if self.image_paths[i].name.startswith("noncrack") else 1
 
 
 class CrackDataset4(CrackDataset):
-    def get_y(self, path: Path) -> Any:
-        path = path.parent / "masks"
-        return self._get_x(path)
+    def get_y(self, i: int) -> Any:
+        path = self.image_paths[i].parent / "masks"
+        return self._transform(path)
 
 
 @dataclass
 class DataResult:
     dataset: CrackDataset
     test_dataset: CrackDataset
+    train_dataset: Subset
+    val_dataset: Subset
 
     train_loader: DataLoader
     val_loader: DataLoader
@@ -73,7 +80,8 @@ class DataResult:
 def _load3(
     transform: Callable | None = None,
     val_size: float = 0.3,
-    batch_size: int = 32
+    batch_size: int = 32,
+    random_state: int = 17,
 ) -> DataResult:
     dataset = CrackDataset3(root_dir="data/train", transform=transform)
 
@@ -81,7 +89,7 @@ def _load3(
     labels = dataset.labels
 
     train_indices, val_indices = train_test_split(
-        indices, test_size=val_size, stratify=labels, random_state=42
+        indices, test_size=val_size, stratify=labels, random_state=random_state
     )
 
     train_dataset = Subset(dataset, train_indices)
@@ -101,6 +109,8 @@ def _load3(
     return DataResult(
         dataset=dataset,
         test_dataset=test_dataset,
+        train_dataset=train_dataset,
+        val_dataset=val_dataset,
         train_loader=train_loader,
         val_loader=val_loader,
         test_loader=test_loader,
@@ -110,14 +120,15 @@ def _load3(
 def _load4(
     transform: Callable | None = None,
     val_size: float = 0.3,
-    batch_size: int = 32
+    batch_size: int = 32,
+    random_state: int = 17,
 ) -> DataResult:
     dataset = CrackDataset3(root_dir="data/train", transform=transform)
 
     indices = np.arange(len(dataset))
 
     train_indices, val_indices = train_test_split(
-        indices, test_size=val_size, random_state=42
+        indices, test_size=val_size, random_state=random_state
     )
 
     train_dataset = Subset(dataset, train_indices)
@@ -138,6 +149,8 @@ def _load4(
         dataset=dataset,
         test_dataset=test_dataset,
         train_loader=train_loader,
+        train_dataset=train_dataset,
+        val_dataset=val_dataset,
         val_loader=val_loader,
         test_loader=test_loader,
     )
