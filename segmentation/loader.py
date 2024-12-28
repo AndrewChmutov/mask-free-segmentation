@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Literal, override
+from typing import Any, Callable, Literal
 
 import numpy as np
 from PIL import Image
@@ -37,7 +37,6 @@ class WithTransform(CrackDataset):
         assert "transform" in kwargs
         self.transform = kwargs["transform"]
 
-    @override
     def _transform(self, path):
         image = super()._transform(path)
         if self.transform:
@@ -54,7 +53,6 @@ class CrackDataset3(WithTransform):
     def _get_x(self, i: int):
         return self.pictures[i]
 
-    @override
     def _get_y(self, i: int):
         return 0 if self.image_paths[i].name.startswith("noncrack") else 1
 
@@ -81,9 +79,9 @@ def _load3(
     transform: Callable | None = None,
     val_size: float = 0.3,
     batch_size: int = 32,
-    random_state: int = 17,
+    random_state: int = 17
 ) -> DataResult:
-    dataset = CrackDataset3(root_dir="data/train", transform=transform)
+    dataset = CrackDataset3(root_dir="../project2/data/train", transform=transform)
 
     indices = np.arange(len(dataset))
     labels = dataset.labels
@@ -94,7 +92,7 @@ def _load3(
 
     train_dataset = Subset(dataset, train_indices)
     val_dataset = Subset(dataset, val_indices)
-    test_dataset = CrackDataset3(root_dir="data/test", transform=transform)
+    test_dataset = CrackDataset3(root_dir="../project2/data/test", transform=transform)
 
     train_loader = DataLoader(
         train_dataset, batch_size=batch_size, shuffle=True
@@ -123,7 +121,7 @@ def _load4(
     batch_size: int = 32,
     random_state: int = 17,
 ) -> DataResult:
-    dataset = CrackDataset3(root_dir="data/train", transform=transform)
+    dataset = CrackDataset3(root_dir="../project2/data/train", transform=transform)
 
     indices = np.arange(len(dataset))
 
@@ -133,7 +131,7 @@ def _load4(
 
     train_dataset = Subset(dataset, train_indices)
     val_dataset = Subset(train_dataset, val_indices)
-    test_dataset = CrackDataset3(root_dir="data/test", transform=transform)
+    test_dataset = CrackDataset3(root_dir="../project2/data/test", transform=transform)
 
     train_loader = DataLoader(
         train_dataset, batch_size=batch_size, shuffle=True
