@@ -5,6 +5,7 @@ import numpy as np
 import skimage
 import torch
 from captum.attr import IntegratedGradients
+from torch._prims_common import DeviceLikeType
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
 from torchvision.models import (
@@ -17,15 +18,17 @@ from tqdm import tqdm
 
 
 class CrackModel:
-    @staticmethod
-    def get_device():
-        return torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    def __init__(self, model, criterion, optimizer: torch.optim.Optimizer):
-        self.model = model
+    def __init__(
+        self,
+        model,
+        criterion,
+        optimizer: torch.optim.Optimizer,
+        device: DeviceLikeType = "cpu",
+    ):
+        self.device = device
+        self.model = model.to(self.device)
         self.criterion = criterion
         self.optimizer = optimizer
-        self.device = self.__class__.get_device()
 
     def train(
         self,
@@ -177,6 +180,7 @@ class ResnetCrackModel(CrackModel):
         self, version: Literal["18"] | Literal["50"],
         path: Path | None = None,
         reuse_weights: bool = True,
+        device: DeviceLikeType = "cpu",
     ):
         match version:
             case "18":
@@ -199,14 +203,11 @@ class ResnetCrackModel(CrackModel):
         if path is not None and Path(path).is_file():
             model.load_state_dict(torch.load(path, weights_only=True))
 
-        # To device
-        model.to(self.__class__.get_device())
-
         # Criterion and Optimizer
         criterion = torch.nn.CrossEntropyLoss()
         optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
-        super().__init__(model, criterion, optimizer)
+        super().__init__(model, criterion, optimizer, device)
 
 
 class CaptumModel:
@@ -215,20 +216,21 @@ class CaptumModel:
         model,
         percentile: float,
         out_shape: tuple[int, int] = (448, 448),
+        device: DeviceLikeType = "cpu",
     ) -> None:
         self.model = model
         self.percentile = percentile
         self.postprocessors = None
         self.out_shape = out_shape
+        self.device = device
 
     def __call__(self, dataset: Dataset, use_tqdm: bool = True) -> Iterator:
         self.model.eval()
-        device = CrackModel.get_device()
         dataloader = DataLoader(dataset, batch_size=1)
 
         for path, input_tensor, expected in tqdm(dataloader, disable=not use_tqdm):
             # Predict
-            input_tensor = input_tensor.to(device)
+            input_tensor = input_tensor.to(self.device)
             with torch.no_grad():
                 output = self.model(input_tensor)
             pred_class = output.argmax().item()
