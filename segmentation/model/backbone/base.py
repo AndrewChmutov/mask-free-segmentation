@@ -30,7 +30,7 @@ class CrackModel:
         val_loader: DataLoader,
         epochs: int = 10,
         best_model: bool = True,
-        val_acc_threshold: float | None = 0.98,
+        val_acc_threshold: float | None = 0.99,
         stagnation_threshold: int | None = 5
     ):
         train_losses = []
