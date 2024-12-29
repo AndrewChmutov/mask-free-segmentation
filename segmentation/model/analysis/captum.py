@@ -2,25 +2,11 @@ import numpy as np
 import skimage
 import torch
 from captum.attr import IntegratedGradients
-from torch._prims_common import DeviceLikeType
 
 from segmentation.model.analysis.base import AnalysisModel
 
 
 class CaptumModel(AnalysisModel):
-    def __init__(
-        self,
-        model,
-        percentile: float,
-        out_shape: tuple[int, int] = (448, 448),
-        device: DeviceLikeType = "cpu",
-    ) -> None:
-        self.model = model
-        self.percentile = percentile
-        self.postprocessors = None
-        self.out_shape = out_shape
-        self.device = device
-
     def _process(self, path, inputs, expected):
         # Predict
         input_tensor = inputs.to(self.device)
@@ -63,3 +49,15 @@ class CaptumModel(AnalysisModel):
         heatmap = heatmap.max(2)[0]
 
         return heatmap
+
+    @classmethod
+    def _default_postprocessors(cls):
+        return [cls._morphology]
+
+    @staticmethod
+    def _morphology(path, predicted, expected):
+        predicted = skimage.morphology.closing(predicted)
+        predicted = skimage.morphology.opening(predicted)
+        predicted = skimage.morphology.dilation(predicted)
+        predicted = predicted > 0
+        return path, predicted, expected

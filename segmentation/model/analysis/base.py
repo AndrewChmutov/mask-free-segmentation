@@ -2,10 +2,13 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Callable, Iterator
 
+import skimage
 import torch
 from torch._prims_common import DeviceLikeType
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
+
+from segmentation import loss
 
 
 class AnalysisModel(ABC):
@@ -19,7 +22,7 @@ class AnalysisModel(ABC):
     ) -> None:
         self.model = model
         self.percentile = percentile
-        self.postprocessors = None
+        self.postprocessors = self._default_postprocessors()
         self.out_shape = out_shape
         self.device = device
 
@@ -66,4 +69,30 @@ class AnalysisModel(ABC):
         return self
 
     def collect(self, dataset: Dataset, use_tqdm: bool = True):
-        return list(self(dataset, use_tqdm))
+        loss_funcs = self._default_loss_funcs()
+        losses = {key: 0 for key in loss_funcs}
+
+        def loss_callback(path, predicted, expected):
+            for key in losses:
+                losses[key] += loss_funcs[key](predicted, expected)
+            return path, expected, expected
+
+        self.postprocessors.append(loss_callback)
+        try:
+            results = list(self(dataset, use_tqdm))
+        finally:
+            self.postprocessors.pop()
+
+        losses = {key: 1 - value for key, value in losses.items()}
+        return results, losses
+
+    @classmethod
+    def _default_postprocessors(cls):
+        return []
+
+    @staticmethod
+    def _default_loss_funcs():
+        return {
+            "IOU": loss.iou,
+            "Dice": loss.dice,
+        }
