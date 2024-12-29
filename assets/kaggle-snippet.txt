@@ -2,4 +2,4 @@
 !git clone https://github.com/AndrewChmutov/mask-free-segmentation
 !cd mask-free-segmentation && pip install . 1> /dev/null
 !ln -sf mask-free-segmentation/segmentation segmentation
-root_dir = /kaggle/input/crack-segmentation-dataset/crack_segmentation_dataset
+root_dir = Path("/kaggle/input/crack-segmentation-dataset/crack_segmentation_dataset")
