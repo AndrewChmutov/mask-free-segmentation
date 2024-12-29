@@ -1,43 +1,66 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Literal, override
+from typing import Any, Callable, Literal
 
 import numpy as np
+import torch
 from PIL import Image
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset, Subset
+from tqdm import trange
 
 
 class CrackDataset(ABC, Dataset):
-    def __init__(self, root_dir: str | Path, **kwargs):
-        self.root_dir = root_dir
+    def __init__(self, root_dir: str | Path, names: list[str] = [], **kwargs):
+        self.root_dir = Path(root_dir)
         self.image_paths = list((Path(root_dir) / "images").iterdir())
+
+        if names:
+            self.image_paths = [
+                path for path in self.image_paths if path in names
+            ]
+
+        desc = self.root_dir.relative_to(self.root_dir.parent.parent)
+        self.X = [
+            self._transform_x(data)
+            for data in trange(len(self), desc=f"{desc}: X")
+        ]
+        self.y = [
+            self._transform_y(data)
+            for data in trange(len(self), desc=f"{desc}: y")
+        ]
 
     def __len__(self):
         return len(self.image_paths)
 
     def _transform(self, path: Path):
-        return Image.open(path).convert("RGB")
+        with Image.open(path) as im:
+            return im.convert("RGB")
 
-    def _get_x(self, i: int) -> Any:
+    def _transform_x(self, i: int):
         return self._transform(self.image_paths[i])
 
     @abstractmethod
-    def _get_y(self, i: int) -> Any:
+    def _transform_y(self, i: int) -> Any:
         ...
 
+    def _get_x(self, i: int):
+        return self.X[i]
+
+    def _get_y(self, i: int):
+        return self.y[i]
+
     def __getitem__(self, idx):
-        return self._get_x(idx), self._get_y(idx)
+        return str(self.image_paths[idx]), self._get_x(idx), self._get_y(idx)
 
 
 class WithTransform(CrackDataset):
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
         assert "transform" in kwargs
         self.transform = kwargs["transform"]
+        super().__init__(*args, **kwargs)
 
-    @override
     def _transform(self, path):
         image = super()._transform(path)
         if self.transform:
@@ -46,23 +69,23 @@ class WithTransform(CrackDataset):
 
 
 class CrackDataset3(WithTransform):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.pictures = list(map(super()._get_x, range(len(self.image_paths))))
-        self.labels = list(map(self._get_y, range(len(self.image_paths))))
-
-    def _get_x(self, i: int):
-        return self.pictures[i]
-
-    @override
-    def _get_y(self, i: int):
+    def _transform_y(self, i: int):
         return 0 if self.image_paths[i].name.startswith("noncrack") else 1
 
 
-class CrackDataset4(CrackDataset):
-    def get_y(self, i: int) -> Any:
-        path = self.image_paths[i].parent / "masks"
-        return self._transform(path)
+class CrackDataset4(WithTransform):
+    def _transform_y(self, i: int) -> Any:
+        path = self.root_dir / "masks" / self.image_paths[i].name
+        return np.array(Image.open(path).convert("L"))
+
+
+class FilteredDataset(Subset):
+    def __init__(self, dataset: CrackDataset, paths: list[str]) -> None:
+        indices = [
+            i for i, path in enumerate(dataset.image_paths)
+            if str(path in paths)
+        ]
+        super().__init__(dataset, indices)
 
 
 @dataclass
@@ -78,15 +101,17 @@ class DataResult:
 
 
 def _load3(
+    root_dir: str | Path,
     transform: Callable | None = None,
     val_size: float = 0.3,
     batch_size: int = 32,
     random_state: int = 17,
 ) -> DataResult:
-    dataset = CrackDataset3(root_dir="data/train", transform=transform)
+    root_dir = Path(root_dir)
+    dataset = CrackDataset3(root_dir=root_dir / "train", transform=transform)
 
     indices = np.arange(len(dataset))
-    labels = dataset.labels
+    labels = dataset.y
 
     train_indices, val_indices = train_test_split(
         indices, test_size=val_size, stratify=labels, random_state=random_state
@@ -94,7 +119,9 @@ def _load3(
 
     train_dataset = Subset(dataset, train_indices)
     val_dataset = Subset(dataset, val_indices)
-    test_dataset = CrackDataset3(root_dir="data/test", transform=transform)
+    test_dataset = CrackDataset3(
+        root_dir=root_dir / "test", transform=transform
+    )
 
     train_loader = DataLoader(
         train_dataset, batch_size=batch_size, shuffle=True
@@ -118,12 +145,14 @@ def _load3(
 
 
 def _load4(
+    root_dir: str | Path,
     transform: Callable | None = None,
     val_size: float = 0.3,
     batch_size: int = 32,
     random_state: int = 17,
 ) -> DataResult:
-    dataset = CrackDataset3(root_dir="data/train", transform=transform)
+    root_dir = Path(root_dir)
+    dataset = CrackDataset3(root_dir=root_dir / "train", transform=transform)
 
     indices = np.arange(len(dataset))
 
@@ -157,11 +186,12 @@ def _load4(
 
 
 def load(
+    root_dir: str | Path,
     version: Literal["3"] | Literal["4"] | Literal["5"],
     **kwargs,
 ) -> DataResult:
     match version:
         case "3" | "5":
-            return _load3(**kwargs)
+            return _load3(root_dir, **kwargs)
         case "4":
-            return _load4(**kwargs)
+            return _load4(root_dir, **kwargs)

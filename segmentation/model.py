@@ -1,11 +1,12 @@
 from pathlib import Path
-from typing import Iterator, Literal
+from typing import Callable, ClassVar, Iterator, Literal
 
 import numpy as np
+import skimage
 import torch
 from captum.attr import IntegratedGradients
-from skimage.transform import resize
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset
+from torchvision import transforms
 from torchvision.models import (
     ResNet18_Weights,
     ResNet50_Weights,
@@ -50,7 +51,7 @@ class CrackModel:
 
             self.model.train()
             train_loss = 0.0
-            for inputs, expected in tqdm(
+            for _, inputs, expected in tqdm(
                 train_loader, desc=f"Epoch {epoch + 1}/{epochs}: Training"
             ):
                 train_loss += self._train_batch(inputs, expected)
@@ -61,7 +62,7 @@ class CrackModel:
 
             print(
                 f"Epoch {epoch + 1}/{epochs} "
-                f"Average Batch Loss: {train_loss}"
+                f"Train Batch Loss: {train_loss}"
             )
 
             ##############
@@ -73,10 +74,14 @@ class CrackModel:
             correct = 0
             total = 0
             with torch.no_grad():
-                for inputs, expected in tqdm(
+                for _, inputs, expected in tqdm(
                     val_loader, desc=f"Epoch {epoch + 1}/{epochs}: Validation"
                 ):
-                    current_loss, current_correct, current_total = self._val_batch(inputs, expected)
+                    (
+                        current_loss,
+                        current_correct,
+                        current_total
+                    ) = self._val_batch(inputs, expected)
 
                     val_loss += current_loss
                     correct += current_correct
@@ -89,7 +94,7 @@ class CrackModel:
             print(f"Epoch {epoch + 1}/{epochs} Val Accuracy: {val_acc:.2f}")
             print(
                 f"Epoch {epoch + 1}/{epochs} "
-                f"Average Batch Loss: {val_loss:.2f}"
+                f"Validation Batch Loss: {val_loss:.2f}"
             )
 
             ##########
@@ -145,7 +150,7 @@ class CrackModel:
         correct = 0
         total = 0
         with torch.no_grad():
-            for inputs, expected in tqdm(test_loader):
+            for _, inputs, expected in tqdm(test_loader):
                 current_loss, current_correct, current_total = self._val_batch(inputs, expected)
 
                 test_loss += current_loss
@@ -159,6 +164,15 @@ class CrackModel:
 
 
 class ResnetCrackModel(CrackModel):
+    TRANSFORM: ClassVar[transforms.Compose] = transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),
+        transforms.Normalize(
+            mean=[0.485, 0.456, 0.406],
+            std=[0.229, 0.224, 0.225]
+        )
+    ])
+
     def __init__(
         self, version: Literal["18"] | Literal["50"],
         path: Path | None = None,
@@ -172,21 +186,23 @@ class ResnetCrackModel(CrackModel):
                 model_cls = resnet50
                 weights = ResNet50_Weights.DEFAULT
 
+        # Use pretrained weights
         if not reuse_weights:
             weights = None
 
+        # Create model
         model = model_cls(weights=weights)
-
-        device = self.__class__.get_device()
-
         num_ftrs = model.fc.in_features
         model.fc = torch.nn.Linear(num_ftrs, 2)
 
+        # Load weights if needed
         if path is not None and Path(path).is_file():
             model.load_state_dict(torch.load(path, weights_only=True))
 
-        model.to(device)
+        # To device
+        model.to(self.__class__.get_device())
 
+        # Criterion and Optimizer
         criterion = torch.nn.CrossEntropyLoss()
         optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
@@ -194,36 +210,76 @@ class ResnetCrackModel(CrackModel):
 
 
 class CaptumModel:
-    def __init__(self, model, percentile: float) -> None:
+    def __init__(
+        self,
+        model,
+        percentile: float,
+        out_shape: tuple[int, int] = (448, 448),
+    ) -> None:
         self.model = model
         self.percentile = percentile
-        self.ig = IntegratedGradients(model)
+        self.postprocessors = None
+        self.out_shape = out_shape
 
-    def __call__(self, loader: DataLoader) -> Iterator:
+    def __call__(self, dataset: Dataset, use_tqdm: bool = True) -> Iterator:
         self.model.eval()
         device = CrackModel.get_device()
+        dataloader = DataLoader(dataset, batch_size=1)
 
-        for inputs, _ in tqdm(loader):
-            inputs = inputs.to(device)
-            # with torch.no_grad():
-            #     outputs = self.model(inputs)
-            # pred_classes = outputs.argmax()
+        for path, input_tensor, expected in tqdm(dataloader, disable=not use_tqdm):
+            # Predict
+            input_tensor = input_tensor.to(device)
+            with torch.no_grad():
+                output = self.model(input_tensor)
+            pred_class = output.argmax().item()
 
-            print("inputs shape", inputs.shape)
-            classes = torch.ones(inputs.shape[0]).to(device)
-            print("classes of interest shape (all ones)", classes.shape)
-            attr = self.ig.attribute(inputs, target=1)  # Annotate Crack
-            heatmaps = attr.squeeze().cpu().detach().numpy()
-            print("heatmaps shape", heatmaps.shape)
+            # Skip if not crack
+            if pred_class == 0:
+                yield self._apply_postprocessor(
+                    path, np.zeros(self.out_shape), expected.squeeze().numpy()
+                )
+                continue
 
-            # Map the ranges
-            heatmaps_mins = heatmaps.min(0)
-            heatmaps_maxs = heatmaps.max(0)
-            heatmaps = (heatmaps - heatmaps_mins) / (heatmaps_maxs - heatmaps_mins)
-            print("heatmaps transformed shape", heatmaps.shape)
+            # Integrate
+            ig = IntegratedGradients(self.model)
+            attr = ig.attribute(input_tensor, target=1)
+            heatmap = attr.squeeze()
+            expected = expected.squeeze()
 
-            bitmap = (heatmaps > np.percentile(heatmaps, 99.5, axis=0)).astype(np.uint8)
-            print("bitmaps shape", bitmap.shape)
-            bitmap = (resize(bitmap, (448, 448), anti_aliasing=False, order=0) > 0.5).astype(np.uint8)
-            print("bitmaps resized shape", bitmap.shape)
-            yield bitmap
+            # To mask
+            heatmap_np = self._get_mask(heatmap).cpu().numpy()
+            expected_np = expected.cpu().numpy()
+            heatmap_resized = skimage.transform.resize(
+                heatmap_np, self.out_shape, anti_aliasing=False
+            )
+
+            yield self._apply_postprocessor(path, heatmap_resized, expected_np)
+
+    def _get_mask(self, heatmap):
+        # Map the ranges
+        heatmap_min = heatmap.min()
+        heatmap_max = heatmap.max()
+        heatmap = (heatmap - heatmap_min) / (heatmap_max - heatmap_min)
+
+        # Threshold and scale
+        heatmap = (
+            heatmap > torch.quantile(heatmap, self.percentile)
+        ).type(torch.uint8)
+
+        # PIL input format
+        heatmap = torch.permute(heatmap, (1, 2, 0))
+        heatmap = heatmap.max(2)[0]
+
+        return heatmap
+
+    def _apply_postprocessor(self, path, predicted, expected):
+        for postprocessor in self.postprocessors or []:
+            path, predicted, expected = postprocessor(path, predicted, expected)
+        return path, predicted, expected
+
+    def with_postprocessor(self, postprocessors: list[Callable]):
+        self.postprocessors = postprocessors
+        return self
+
+    def collect(self, dataset: Dataset, use_tqdm: bool = True):
+        return list(self(dataset, use_tqdm))
