@@ -1,5 +1,10 @@
 from .analysis import AnalysisModel, CaptumModel
-from .backbone import CrackModel, EfficientNetCrackModel, ResnetCrackModel
+from .backbone import (
+    CrackModel,
+    DenseNetCrackModel,
+    EfficientNetCrackModel,
+    ResnetCrackModel,
+)
 
 __all__ = [
     "AnalysisModel",
@@ -7,4 +12,5 @@ __all__ = [
     "CaptumModel",
     "ResnetCrackModel",
     "EfficientNetCrackModel",
+    "DenseNetCrackModel",
 ]

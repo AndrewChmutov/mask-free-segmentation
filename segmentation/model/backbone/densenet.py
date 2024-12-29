@@ -5,16 +5,16 @@ import torch
 from torch._prims_common import DeviceLikeType
 from torchvision import transforms
 from torchvision.models import (
-    ResNet18_Weights,
-    ResNet50_Weights,
-    resnet18,
-    resnet50,
+    DenseNet121_Weights,
+    DenseNet161_Weights,
+    densenet121,
+    densenet161,
 )
 
 from segmentation.model.backbone.base import CrackModel
 
 
-class ResnetCrackModel(CrackModel):
+class DenseNetCrackModel(CrackModel):
     TRANSFORM: ClassVar[transforms.Compose] = transforms.Compose([
         transforms.Resize((224, 224)),
         transforms.ToTensor(),
@@ -25,18 +25,18 @@ class ResnetCrackModel(CrackModel):
     ])
 
     def __init__(
-        self, version: Literal["18"] | Literal["50"],
+        self, version: Literal["121"] | Literal["161"],
         path: Path | None = None,
         reuse_weights: bool = True,
         device: DeviceLikeType = "cpu",
     ):
         match version:
-            case "18":
-                model_cls = resnet18
-                weights = ResNet18_Weights.DEFAULT
-            case "50":
-                model_cls = resnet50
-                weights = ResNet50_Weights.DEFAULT
+            case "121":
+                model_cls = densenet121
+                weights = DenseNet121_Weights.DEFAULT
+            case "161":
+                model_cls = densenet161
+                weights = DenseNet161_Weights.DEFAULT,
 
         # Use pretrained weights
         if not reuse_weights:
@@ -44,7 +44,7 @@ class ResnetCrackModel(CrackModel):
 
         # Create model
         model = model_cls(weights=weights)
-        num_ftrs = model.fc.in_features
+        num_ftrs = model.classifier.in_features
         model.fc = torch.nn.Linear(num_ftrs, 2)
 
         # Criterion and Optimizer

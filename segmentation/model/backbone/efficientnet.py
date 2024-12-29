@@ -38,4 +38,4 @@ class EfficientNetCrackModel(CrackModel):
         criterion = torch.nn.CrossEntropyLoss()
         optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
-        super().__init__(model, criterion, optimizer, device)
+        super().__init__(model, criterion, optimizer, device, path)
