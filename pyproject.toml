@@ -3,6 +3,7 @@ name = "segmentation"
 version = "0.0.1"
 dependencies = [
     "captum",
+    "efficientnet_pytorch",
     "numpy",
     "pillow",
     "scikit-image",
