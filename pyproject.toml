@@ -1,8 +1,22 @@
 [project]
 name = "segmentation"
 version = "0.0.1"
+dependencies = [
+    "captum",
+    "numpy",
+    "pillow",
+    "scikit-image",
+    "scikit-learn",
+    "scipy",
+    "torch",
+    "torchvision",
+    "tqdm",
+]
 
-# dependencies = []
+[project.optional-dependencies]
+jupyterlab = [
+    "jupyterlab"
+]
 
 [build-system]
 requires = ["setuptools", "setuptools_scm"]
