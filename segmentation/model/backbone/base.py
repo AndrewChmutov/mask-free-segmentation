@@ -103,6 +103,8 @@ class CrackModel:
                 no_improvement = 0
                 best_loss = val_loss
                 best_model_dict = self.model.state_dict()
+            else:
+                no_improvement += 1
 
             # Stagnation
             if stagnation_threshold and no_improvement > stagnation_threshold:
