@@ -97,3 +97,6 @@ class AnalysisModel(ABC):
             "IOU": loss.iou,
             "Dice": loss.dice,
         }
+
+    def name(self):
+        return self.__class__.__name__

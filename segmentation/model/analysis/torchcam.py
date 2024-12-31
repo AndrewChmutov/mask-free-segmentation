@@ -1,5 +1,7 @@
 import logging
 
+from tqdm import version
+
 import numpy as np
 import skimage
 import torch
@@ -113,3 +115,6 @@ class TorchCamModel(AnalysisModel):
         ).astype(np.uint8)
 
         return heatmap
+
+    def name(self):
+        return f"{self.__class__.__name__} - {self.version}"
