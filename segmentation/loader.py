@@ -60,11 +60,8 @@ class WithTransform(CrackDataset):
         self.transform = kwargs["transform"]
         super().__init__(*args, **kwargs)
 
-    def _transform(self, path):
-        image = super()._transform(path)
-        if self.transform:
-            image = self.transform(image)
-        return image
+    def _get_x(self, i: int):
+        return self.transform(self.X[i])
 
 
 class CrackDataset3(WithTransform):
