@@ -15,15 +15,6 @@ from segmentation.model.backbone.base import CrackModel
 
 
 class DenseNetCrackModel(CrackModel):
-    TRANSFORM: ClassVar[transforms.Compose] = transforms.Compose([
-        transforms.Resize((224, 224)),
-        transforms.ToTensor(),
-        transforms.Normalize(
-            mean=[0.485, 0.456, 0.406],
-            std=[0.229, 0.224, 0.225]
-        )
-    ])
-
     def __init__(
         self, version: Literal["121"] | Literal["161"],
         path: Path | None = None,

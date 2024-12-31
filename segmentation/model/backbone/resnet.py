@@ -1,9 +1,8 @@
 from pathlib import Path
-from typing import ClassVar, Literal
+from typing import Literal
 
 import torch
 from torch._prims_common import DeviceLikeType
-from torchvision import transforms
 from torchvision.models import (
     ResNet18_Weights,
     ResNet50_Weights,
@@ -15,15 +14,6 @@ from segmentation.model.backbone.base import CrackModel
 
 
 class ResnetCrackModel(CrackModel):
-    TRANSFORM: ClassVar[transforms.Compose] = transforms.Compose([
-        transforms.Resize((224, 224)),
-        transforms.ToTensor(),
-        transforms.Normalize(
-            mean=[0.485, 0.456, 0.406],
-            std=[0.229, 0.224, 0.225]
-        )
-    ])
-
     def __init__(
         self, version: Literal["18"] | Literal["50"],
         path: Path | None = None,
