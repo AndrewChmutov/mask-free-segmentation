@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Callable, Iterator
 
-import skimage
 import torch
 from torch._prims_common import DeviceLikeType
 from torch.utils.data import DataLoader, Dataset
@@ -34,12 +33,9 @@ class AnalysisModel(ABC):
         self.model.eval()
         dataloader = DataLoader(dataset, batch_size=1)
 
-        yield from tqdm(
-            [
-                self._apply_postprocessor(*self._process(*img))
-                for img in dataloader
-            ],
-            disable=not use_tqdm
+        yield from (
+            self._apply_postprocessor(*self._process(*img))
+            for img in tqdm(dataloader, disable=not use_tqdm)
         )
 
     def _get_mask(self, heatmap):
@@ -68,6 +64,10 @@ class AnalysisModel(ABC):
         self.postprocessors = postprocessors
         return self
 
+    def with_extended_postprocessor(self, postprocessors: list[Callable]):
+        self.postprocessors = self.postprocessors + postprocessors
+        return self
+
     def collect(self, dataset: Dataset, use_tqdm: bool = True):
         loss_funcs = self._default_loss_funcs()
         losses = {key: 0 for key in loss_funcs}
@@ -83,7 +83,7 @@ class AnalysisModel(ABC):
         finally:
             self.postprocessors.pop()
 
-        losses = {key: 1 - value for key, value in losses.items()}
+        losses = {key: 1 - value / len(results) for key, value in losses.items()}
         return results, losses
 
     @classmethod
