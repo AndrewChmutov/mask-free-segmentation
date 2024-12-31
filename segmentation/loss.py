@@ -42,7 +42,7 @@ def iou(y_pred, y_true):
     union = np.sum(y_pred | y_true)
 
     # IoU loss
-    iou = intersection / union if union != 0 else 1  # Avoid division by zero
+    iou = intersection / union if union != 0 else 0
     iou = 1 - iou
     return iou
 
@@ -55,7 +55,7 @@ def dice(y_pred, y_true):
     dice = (
         (2 * intersection) /
         (np.sum(y_pred) + np.sum(y_true))
-        if (np.sum(y_pred) + np.sum(y_true)) != 0 else 1
+        if (np.sum(y_pred) + np.sum(y_true)) != 0 else 0
     )
     dice = 1 - dice
     return dice
