@@ -16,9 +16,10 @@ from segmentation.model.backbone.base import CrackModel
 class ResnetCrackModel(CrackModel):
     def __init__(
         self, version: Literal["18"] | Literal["50"],
-        path: Path | None = None,
         reuse_weights: bool = True,
         device: DeviceLikeType = "cpu",
+        path: Path | None = None,
+        load_model: bool = False,
     ):
         match version:
             case "18":
@@ -41,4 +42,4 @@ class ResnetCrackModel(CrackModel):
         criterion = torch.nn.CrossEntropyLoss()
         optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
-        super().__init__(model, criterion, optimizer, device, path)
+        super().__init__(model, criterion, optimizer, device, path, load_model)

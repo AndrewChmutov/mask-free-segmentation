@@ -14,11 +14,13 @@ class CrackModel:
         optimizer: torch.optim.Optimizer,
         device: DeviceLikeType = "cpu",
         path: str | Path | None = None,
+        load_model: bool = False,
     ):
         # Load weights if needed
-        if path is not None and Path(path).is_file():
+        if path is not None and Path(path).is_file() and load_model:
             model.load_state_dict(torch.load(path, weights_only=True))
 
+        self.path = path
         self.device = device
         self.model = model.to(self.device)
         self.criterion = criterion
@@ -164,3 +166,6 @@ class CrackModel:
         test_acc = correct / total
 
         return test_loss, test_acc
+
+    def save(self):
+        torch.save(self.model.state_dict(), str(self.path))

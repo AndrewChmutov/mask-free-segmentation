@@ -10,9 +10,10 @@ from segmentation.model.backbone.base import CrackModel
 class EfficientNetCrackModel(CrackModel):
     def __init__(
         self, version: str,
-        path: str | Path | None = None,
         reuse_weights: bool = True,
         device: DeviceLikeType = "cpu",
+        path: str | Path | None = None,
+        load_model: bool = False,
     ):
         # Use pretrained weights
         if not reuse_weights:
@@ -27,4 +28,4 @@ class EfficientNetCrackModel(CrackModel):
         criterion = torch.nn.CrossEntropyLoss()
         optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
-        super().__init__(model, criterion, optimizer, device, path)
+        super().__init__(model, criterion, optimizer, device, path, load_model)
