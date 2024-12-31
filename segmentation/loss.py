@@ -37,6 +37,9 @@ def tversky(y_pred, y_true, alpha=5, beta=0.3):
 
 
 def iou(y_pred, y_true):
+    y_pred = y_pred > 0.5
+    y_true = y_true > 0.5
+
     # Intersection and Union
     intersection = np.sum(y_pred & y_true)
     union = np.sum(y_pred | y_true)
@@ -48,6 +51,9 @@ def iou(y_pred, y_true):
 
 
 def dice(y_pred, y_true):
+    y_pred = y_pred > 0.5
+    y_true = y_true > 0.5
+
     # Intersection
     intersection = np.sum(y_pred & y_true)
 
