@@ -1,7 +1,5 @@
 import logging
 
-from tqdm import version
-
 import numpy as np
 import skimage
 import torch
@@ -47,6 +45,7 @@ class TorchCamModel(AnalysisModel):
         layer: str | None = None,
     ) -> None:
         super().__init__(model, percentile, out_shape, device)
+        self.version_str = version
         match version:
             case "CAM":
                 self.version = CAM
@@ -117,4 +116,4 @@ class TorchCamModel(AnalysisModel):
         return heatmap
 
     def name(self):
-        return f"{self.__class__.__name__} - {self.version}"
+        return f"{self.__class__.__name__} - {self.version_str}"
