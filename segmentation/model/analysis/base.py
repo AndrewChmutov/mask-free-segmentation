@@ -33,10 +33,13 @@ class AnalysisModel(ABC):
         self.model.eval()
         dataloader = DataLoader(dataset, batch_size=1)
 
-        yield from (
-            self._apply_postprocessor(*self._process(*img))
-            for img in tqdm(dataloader, disable=not use_tqdm)
-        )
+        try:
+            yield from (
+                self._apply_postprocessor(*self._process(*img))
+                for img in tqdm(dataloader, disable=not use_tqdm)
+            )
+        finally:
+            pass
 
     def _get_mask(self, heatmap):
         # Map the ranges
