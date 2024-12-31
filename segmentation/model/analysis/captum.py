@@ -56,8 +56,10 @@ class CaptumModel(AnalysisModel):
 
     @staticmethod
     def _morphology(path, predicted, expected):
+        predicted = skimage.morphology.dilation(predicted)
         predicted = skimage.morphology.closing(predicted)
         predicted = skimage.morphology.opening(predicted)
-        predicted = skimage.morphology.dilation(predicted)
+        for _ in range(5):
+            predicted = skimage.morphology.dilation(predicted)
         predicted = predicted > 0
         return path, predicted, expected
