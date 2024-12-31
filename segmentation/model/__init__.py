@@ -1,4 +1,4 @@
-from .analysis import AnalysisModel, CaptumModel
+from .analysis import AnalysisModel, CaptumModel, TorchCamModel
 from .backbone import (
     CrackModel,
     DenseNetCrackModel,
@@ -8,9 +8,10 @@ from .backbone import (
 
 __all__ = [
     "AnalysisModel",
-    "CrackModel",
     "CaptumModel",
-    "ResnetCrackModel",
-    "EfficientNetCrackModel",
+    "CrackModel",
     "DenseNetCrackModel",
+    "EfficientNetCrackModel",
+    "ResnetCrackModel",
+    "TorchCamModel",
 ]
