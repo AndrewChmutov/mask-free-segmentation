@@ -78,7 +78,7 @@ class AnalysisModel(ABC):
         def loss_callback(path, predicted, expected):
             for key in losses:
                 losses[key] += loss_funcs[key](predicted, expected)
-            return path, expected, expected
+            return path, predicted, expected
 
         self.postprocessors.append(loss_callback)
         try:
