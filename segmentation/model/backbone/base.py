@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Any
 
 import torch
 from torch._prims_common import DeviceLikeType
@@ -9,13 +10,13 @@ from tqdm import tqdm
 class CrackModel:
     def __init__(
         self,
-        model,
-        criterion,
+        model: Any,
+        criterion: Any,
         optimizer: torch.optim.Optimizer,
         device: DeviceLikeType = "cpu",
         path: str | Path | None = None,
         load_model: bool = False,
-    ):
+    ) -> None:
         # Load weights if needed
         if path is not None and Path(path).is_file() and load_model:
             model.load_state_dict(torch.load(path, weights_only=True))
@@ -33,8 +34,8 @@ class CrackModel:
         epochs: int = 10,
         best_model: bool = True,
         val_acc_threshold: float | None = 0.99,
-        stagnation_threshold: int | None = 5
-    ):
+        stagnation_threshold: int | None = 5,
+    ) -> None:
         train_losses = []
         val_losses = []
         val_accs = []
@@ -76,11 +77,9 @@ class CrackModel:
                 for _, inputs, expected in tqdm(
                     val_loader, desc=f"Epoch {epoch + 1}/{epochs}: Validation"
                 ):
-                    (
-                        current_loss,
-                        current_correct,
-                        current_total
-                    ) = self._val_batch(inputs, expected)
+                    (current_loss, current_correct, current_total) = (
+                        self._val_batch(inputs, expected)
+                    )
 
                     val_loss += current_loss
                     correct += current_correct
@@ -119,7 +118,7 @@ class CrackModel:
         if best_model and best_model_dict:
             self.model.load_state_dict(best_model_dict)
 
-    def _train_batch(self, inputs, expected):
+    def _train_batch(self, inputs: Any, expected: Any) -> float:
         inputs, expected = inputs.to(self.device), expected.to(self.device)
 
         # Make predictions and perform step
@@ -132,7 +131,7 @@ class CrackModel:
         # Evaluate
         return loss.item()
 
-    def _val_batch(self, inputs, expected):
+    def _val_batch(self, inputs: Any, expected: Any) -> Any:
         inputs, expected = inputs.to(self.device), expected.to(self.device)
 
         # Make predictions
@@ -146,17 +145,15 @@ class CrackModel:
         return loss, correct, total
 
     @torch.no_grad
-    def evaluate(self, test_loader: DataLoader):
+    def evaluate(self, test_loader: DataLoader) -> tuple[float, float]:
         test_loss = 0.0
         correct = 0
         total = 0
         with torch.no_grad():
             for _, inputs, expected in tqdm(test_loader):
-                (
-                    current_loss,
-                    current_correct,
-                    current_total
-                ) = self._val_batch(inputs, expected)
+                (current_loss, current_correct, current_total) = (
+                    self._val_batch(inputs, expected)
+                )
 
                 test_loss += current_loss
                 correct += current_correct
@@ -167,5 +164,5 @@ class CrackModel:
 
         return test_loss, test_acc
 
-    def save(self):
+    def save(self) -> None:
         torch.save(self.model.state_dict(), str(self.path))

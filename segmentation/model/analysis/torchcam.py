@@ -1,4 +1,5 @@
 import logging
+from typing import Any
 
 import numpy as np
 import skimage
@@ -37,7 +38,7 @@ class TorchCamModel(AnalysisModel):
 
     def __init__(
         self,
-        model,
+        model: Any,
         percentile: float,
         out_shape: tuple[int, int] = (448, 448),
         device: DeviceLikeType = "cpu",
@@ -69,7 +70,9 @@ class TorchCamModel(AnalysisModel):
                 raise NotImplementedError
         self.layer = layer
 
-    def _process(self, path, inputs, expected):
+    def _process(
+        self, path: str, inputs: Any, expected: Any
+    ) -> tuple[str, Any, Any]:
         # Predict
         input_tensor = inputs.to(self.device)
         with torch.no_grad():
@@ -78,14 +81,25 @@ class TorchCamModel(AnalysisModel):
 
         # Skip if not crack
         if pred_class == 0:
-            return path, np.zeros(self.out_shape, dtype=np.uint8), expected.squeeze().numpy()
+            return (
+                path,
+                np.zeros(self.out_shape, dtype=np.uint8),
+                expected.squeeze().numpy(),
+            )
 
         # Integrate
-        with self.version(self.model, target_layer=self.layer) as cam_extractor:
+        with self.version(
+            self.model, target_layer=self.layer
+        ) as cam_extractor:
             # Preprocess your data and feed it to the model
             out = self.model(input_tensor)
             # Retrieve the CAM by passing the class index and the model output
-            heatmap = cam_extractor(out.squeeze(0).argmax().item(), out)[0].squeeze().cpu().numpy()
+            heatmap = (
+                cam_extractor(out.squeeze(0).argmax().item(), out)[0]
+                .squeeze()
+                .cpu()
+                .numpy()
+            )
 
         # DEBUG
         # source_image = Image.open(path[0]).convert("RGB")
@@ -93,7 +107,9 @@ class TorchCamModel(AnalysisModel):
         # DEBUG
 
         heatmap = skimage.transform.resize(
-            heatmap, self.out_shape, anti_aliasing=False,
+            heatmap,
+            self.out_shape,
+            anti_aliasing=False,
         )
 
         # To mask
@@ -102,7 +118,7 @@ class TorchCamModel(AnalysisModel):
 
         return path, heatmap, expected_np
 
-    def _get_mask(self, heatmap):
+    def _get_mask(self, heatmap: Any) -> Any:
         # Map the ranges
         heatmap_min = heatmap.min()
         heatmap_max = heatmap.max()
@@ -115,5 +131,5 @@ class TorchCamModel(AnalysisModel):
 
         return heatmap
 
-    def name(self):
+    def name(self) -> str:
         return f"{self.__class__.__name__} - {self.version_str}"

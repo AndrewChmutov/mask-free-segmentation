@@ -11,7 +11,9 @@ from tqdm import trange
 
 
 class CrackDataset(ABC, Dataset):
-    def __init__(self, root_dir: str | Path, names: list[str] = [], **kwargs):
+    def __init__(
+        self, root_dir: str | Path, names: list[str] = [], **kwargs
+    ) -> None:
         self.root_dir = Path(root_dir)
         self.image_paths = list((Path(root_dir) / "images").iterdir())
 
@@ -30,42 +32,41 @@ class CrackDataset(ABC, Dataset):
             for data in trange(len(self), desc=f"{desc}: y")
         ]
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.image_paths)
 
-    def _transform(self, path: Path):
+    def _transform(self, path: Path) -> Image.Image:
         with Image.open(path) as im:
             return im.convert("RGB")
 
-    def _transform_x(self, i: int):
+    def _transform_x(self, i: int) -> Image.Image:
         return self._transform(self.image_paths[i])
 
     @abstractmethod
-    def _transform_y(self, i: int) -> Any:
-        ...
+    def _transform_y(self, i: int) -> Any: ...
 
-    def _get_x(self, i: int):
+    def _get_x(self, i: int) -> Image.Image:
         return self.X[i]
 
-    def _get_y(self, i: int):
+    def _get_y(self, i: int) -> Any:
         return self.y[i]
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int) -> tuple[str, Any, Any]:
         return str(self.image_paths[idx]), self._get_x(idx), self._get_y(idx)
 
 
 class WithTransform(CrackDataset):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         assert "transform" in kwargs
         self.transform = kwargs["transform"]
         super().__init__(*args, **kwargs)
 
-    def _get_x(self, i: int):
+    def _get_x(self, i: int) -> Image.Image:
         return self.transform(self.X[i])
 
 
 class CrackDataset3(WithTransform):
-    def _transform_y(self, i: int):
+    def _transform_y(self, i: int) -> Any:
         return 0 if self.image_paths[i].name.startswith("noncrack") else 1
 
 
@@ -78,7 +79,8 @@ class CrackDataset4(WithTransform):
 class FilteredDataset(Subset):
     def __init__(self, dataset: CrackDataset, paths: list[str]) -> None:
         indices = [
-            i for i, path in enumerate(dataset.image_paths)
+            i
+            for i, path in enumerate(dataset.image_paths)
             if str(path in paths)
         ]
         super().__init__(dataset, indices)
@@ -122,9 +124,7 @@ def _load3(
     train_loader = DataLoader(
         train_dataset, batch_size=batch_size, shuffle=True
     )
-    val_loader = DataLoader(
-        val_dataset, batch_size=batch_size, shuffle=False
-    )
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
     test_loader = DataLoader(
         test_dataset, batch_size=batch_size, shuffle=False
     )
@@ -163,9 +163,7 @@ def _load4(
     train_loader = DataLoader(
         train_dataset, batch_size=batch_size, shuffle=True
     )
-    val_loader = DataLoader(
-        val_dataset, batch_size=batch_size, shuffle=False
-    )
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
     test_loader = DataLoader(
         test_dataset, batch_size=batch_size, shuffle=False
     )

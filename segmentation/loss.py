@@ -1,8 +1,12 @@
+from typing import Any
+
 import numpy as np
 from scipy.special import softmax
 
 
-def weighted_crossentropy(y_pred, y_true, class_weights=[1.0, 5.0]):
+def weighted_crossentropy(
+    y_pred: Any, y_true: Any, class_weights: list[float] = [1.0, 5.0]
+) -> float:
     # Apply softmax to logits
     y_pred = softmax(y_pred, axis=-1)
 
@@ -19,7 +23,9 @@ def weighted_crossentropy(y_pred, y_true, class_weights=[1.0, 5.0]):
     return np.mean(weighted)
 
 
-def tversky(y_pred, y_true, alpha=5, beta=0.3):
+def tversky(
+    y_pred: Any, y_true: Any, alpha: float = 5.0, beta: Any = 0.3
+) -> float:
     # Apply softmax to logits
     y_pred = softmax(y_pred, axis=-1)
 
@@ -36,7 +42,7 @@ def tversky(y_pred, y_true, alpha=5, beta=0.3):
     return 1 - np.mean(tversky_index)
 
 
-def iou(y_pred, y_true):
+def iou(y_pred: Any, y_true: Any) -> float:
     y_pred = y_pred > 0.5
     y_true = y_true > 0.5
 
@@ -50,7 +56,7 @@ def iou(y_pred, y_true):
     return iou
 
 
-def dice(y_pred, y_true):
+def dice(y_pred: Any, y_true: Any) -> float:
     y_pred = y_pred > 0.5
     y_true = y_true > 0.5
 
@@ -59,9 +65,9 @@ def dice(y_pred, y_true):
 
     # Dice coefficient
     dice = (
-        (2 * intersection) /
-        (np.sum(y_pred) + np.sum(y_true))
-        if (np.sum(y_pred) + np.sum(y_true)) != 0 else 1
+        (2 * intersection) / (np.sum(y_pred) + np.sum(y_true))
+        if (np.sum(y_pred) + np.sum(y_true)) != 0
+        else 1
     )
     dice = 1 - dice
     return dice

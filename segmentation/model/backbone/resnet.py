@@ -15,12 +15,13 @@ from segmentation.model.backbone.base import CrackModel
 
 class ResnetCrackModel(CrackModel):
     def __init__(
-        self, version: Literal["18"] | Literal["50"],
+        self,
+        version: Literal["18"] | Literal["50"],
         reuse_weights: bool = True,
         device: DeviceLikeType = "cpu",
         path: Path | None = None,
         load_model: bool = False,
-    ):
+    ) -> None:
         match version:
             case "18":
                 model_cls = resnet18

@@ -1,13 +1,17 @@
+from typing import Any
+
 import numpy as np
 import skimage
 import torch
 from captum.attr import IntegratedGradients
 
-from segmentation.model.analysis.base import AnalysisModel
+from segmentation.model.analysis.base import AnalysisModel, ProcessorFunc
 
 
 class CaptumModel(AnalysisModel):
-    def _process(self, path, inputs, expected):
+    def _process(
+        self, path: str, inputs: Any, expected: Any
+    ) -> tuple[str, Any, Any]:
         # Predict
         input_tensor = inputs.to(self.device)
         with torch.no_grad():
@@ -33,16 +37,16 @@ class CaptumModel(AnalysisModel):
 
         return path, heatmap_resized, expected_np
 
-    def _get_mask(self, heatmap):
+    def _get_mask(self, heatmap: Any) -> Any:
         # Map the ranges
         heatmap_min = heatmap.min()
         heatmap_max = heatmap.max()
         heatmap = (heatmap - heatmap_min) / (heatmap_max - heatmap_min)
 
         # Threshold and scale
-        heatmap = (
-            heatmap > torch.quantile(heatmap, self.percentile)
-        ).type(torch.uint8)
+        heatmap = (heatmap > torch.quantile(heatmap, self.percentile)).type(
+            torch.uint8
+        )
 
         # PIL input format
         heatmap = torch.permute(heatmap, (1, 2, 0))
@@ -51,11 +55,13 @@ class CaptumModel(AnalysisModel):
         return heatmap
 
     @classmethod
-    def _default_postprocessors(cls):
+    def _default_postprocessors(cls) -> list[ProcessorFunc]:
         return [cls._morphology]
 
     @staticmethod
-    def _morphology(path, predicted, expected):
+    def _morphology(
+        path: str, predicted: Any, expected: Any
+    ) -> tuple[str, Any, Any]:
         predicted = skimage.morphology.dilation(predicted)
         predicted = skimage.morphology.closing(predicted)
         predicted = skimage.morphology.opening(predicted)

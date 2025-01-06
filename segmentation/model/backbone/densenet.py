@@ -15,19 +15,20 @@ from segmentation.model.backbone.base import CrackModel
 
 class DenseNetCrackModel(CrackModel):
     def __init__(
-        self, version: Literal["121"] | Literal["161"],
+        self,
+        version: Literal["121"] | Literal["161"],
         reuse_weights: bool = True,
         device: DeviceLikeType = "cpu",
         path: Path | None = None,
         load_model: bool = False,
-    ):
+    ) -> None:
         match version:
             case "121":
                 model_cls = densenet121
                 weights = DenseNet121_Weights.DEFAULT
             case "161":
                 model_cls = densenet161
-                weights = DenseNet161_Weights.DEFAULT,
+                weights = (DenseNet161_Weights.DEFAULT,)
 
         # Use pretrained weights
         if not reuse_weights:

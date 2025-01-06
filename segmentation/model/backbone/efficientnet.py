@@ -9,12 +9,13 @@ from segmentation.model.backbone.base import CrackModel
 
 class EfficientNetCrackModel(CrackModel):
     def __init__(
-        self, version: str,
+        self,
+        version: str,
         reuse_weights: bool = True,
         device: DeviceLikeType = "cpu",
         path: str | Path | None = None,
         load_model: bool = False,
-    ):
+    ) -> None:
         # Use pretrained weights
         if not reuse_weights:
             model = EfficientNet.from_name(version)
